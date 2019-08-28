@@ -1,0 +1,127 @@
+script_name("PChat")
+script_version("0.0.0.2")
+script_author("Разработчик: MsFoxyChocolate")
+script_dependencies("SAMPFUNCS, SAMP")
+local res, encoding     = pcall(require, "encoding")
+assert(res, 'Library encoding not found')
+require "luairc"
+
+encoding.default        = 'CP1251'
+u8                      = encoding.UTF8
+CHANNEL                 = "#USMOHadvancerp"
+
+function main()
+	autoupdate("https://raw.githubusercontent.com/FoxChocolate/PChat/master/version.json", '['..string.upper(thisScript().name)..']: ', "https://vk.com/szktq")
+	if not isSampfuncsLoaded() or not isSampLoaded() then return end
+	while not isSampAvailable() do wait(100) end
+	math.randomseed(os.time())
+	while not sampIsLocalPlayerSpawned() do wait(50) end
+	local _, id = sampGetPlayerIdByCharHandle(PLAYER_PED)
+	while sampGetPlayerScore(id) == 0 do wait(50) end
+	local sleep = require "socket".sleep
+	sampAddChatMessage("[$Senju Clan$]: {FFFFFF}Connecting to chat... {00ff00}(It may hang for a while, but it's normal)", 0xff0000)
+	wait(5000)
+	result, playerID = sampGetPlayerIdByCharHandle(playerPed)
+	if result then
+		name = sampGetPlayerNickname(playerID)
+		cl = irc.new{nick = name}
+	end
+	cl:connect('irc.esper.net')
+	cl:join(CHANNEL)
+	sampAddChatMessage("[$Senju Clan$] {FFFFFF}Connection {00ff00}complete{FFFFFF}!" , 0xff0000)
+	sampRegisterChatCommand("chat", sendServerMsg)
+	sampAddChatMessage('[$Senju Clan$] {FFFFFF}Добро пожаловать в {0xff0000}Senju Family{FFFFFF} | Версия: {0088ff}'..thisScript().version..'{FFFFFF}.', 0xff0000)
+	sampAddChatMessage('[$Senju Clan$] {FFFFFF}Отправлять сообщение [{0088ff} /chat [сообщение]{FFFFFF} ]', 0xff0000)
+	cl:hook("OnChat", function(user, channel, message)
+		sampAddChatMessage("[$Senju Clan$] {0095ff}"..user.nick..": "..u8:decode(message), 0xff0000)
+	end)
+	cl:hook("OnJoin", function(user, channel)
+		sampAddChatMessage("[$Senju Clan$] {0095ff}"..user.nick.."{FFFFFF} подключился(-ась) к чату.", 0xff0000)
+	end)
+	cl:hook("OnQuit", function(user, channel)
+		sampAddChatMessage("[$Senju Clan$] {0095ff}"..user.nick.."{FFFFFF} отключается(-ась) от чата.", 0xff0000)
+	end)
+	while true do 
+		cl:think()
+		wait(500)
+	end
+end
+
+function sendServerMsg(param)
+	local customtext = string.match(param, '%s*(.+)')
+	if customtext ~= nil then
+		if customtextz ~= true then
+			sampAddChatMessage("[$Senju Clan$] {0095ff}"..sampGetPlayerNickname(playerID)..": "..param, 0xff0000)
+			cl:sendChat(CHANNEL, u8(customtext))
+			customtextz = true
+			lua_thread.create(function()
+				while true do wait(0)
+					if customtextz == true then
+						wait(3000)
+						customtextz = false
+					end
+				end
+			end)
+		else
+			sampAddChatMessage('[$Senju Clan$] {FFFFFF}Вам необходимо подождать 3 секунды, прежде чем отправить сообщение.', 0xff0000)
+		end
+	else
+		sampAddChatMessage('[$Senju Clan$] {FFFFFF}Используйте комаду [{0088ff} /chat [сообщение]{FFFFFF} ]', 0xff0000)
+	end
+end
+
+function autoupdate(json_url, prefix, url)
+  local dlstatus = require('moonloader').download_status
+  local json = getWorkingDirectory() .. '\\'..thisScript().name..'-version.json'
+  if doesFileExist(json) then os.remove(json) end
+  downloadUrlToFile(json_url, json,
+	function(id, status, p1, p2)
+	  if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+		if doesFileExist(json) then
+		  local f = io.open(json, 'r')
+		  if f then
+			local info = decodeJson(f:read('*a'))
+			updatelink = info.updateurl
+			updateversion = info.latest
+			f:close()
+			os.remove(json)
+			if updateversion ~= thisScript().version then
+			  lua_thread.create(function(prefix)
+				local dlstatus = require('moonloader').download_status
+				local color = -1
+				sampAddChatMessage('[$Senju Clan$] {FFFFFF}Обнаружено обновление. Пытаюсь обновиться c '..thisScript().version..' на '..updateversion, 0xff0000)
+				wait(250)
+				downloadUrlToFile(updatelink, thisScript().path,
+				  function(id3, status1, p13, p23)
+					if status1 == dlstatus.STATUS_DOWNLOADINGDATA then
+					  print(string.format('Загружено %d из %d.', p13, p23))
+					elseif status1 == dlstatus.STATUS_ENDDOWNLOADDATA then
+					  print('Загрузка обновления завершена.')
+					  sampAddChatMessage('[$Senju Clan$] {FFFFFF}Обновление завершено!', 0xff0000)
+					  goupdatestatus = true
+					  lua_thread.create(function() wait(500) thisScript():reload() end)
+					end
+					if status1 == dlstatus.STATUSEX_ENDDOWNLOAD then
+					  if goupdatestatus == nil then
+						sampAddChatMessage('[$Senju Clan$] {FF0000}Ошибка! {FFFFFF}Обновление прошло неудачно. Запускаю устаревшую версию...', 0xff0000)
+						update = false
+					  end
+					end
+				  end
+				)
+				end, prefix
+			  )
+			else
+			  update = false
+			  print('v'..thisScript().version..': Обновление не требуется.')
+			end
+		  end
+		else
+		  print('v'..thisScript().version..': Не могу проверить обновление. Смиритесь или проверьте самостоятельно на '..url)
+		  update = false
+		end
+	  end
+	end
+  )
+  while update ~= false do wait(100) end
+end
